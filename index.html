@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The 1099 Radar — free Google Sheets tool (Build It With AI, Ep 25)</title>
+<style>
+:root{--ink:#1d2730;--paper:#f6f4ee;--card:#fffdf8;--rust:#a74e26;--steel:#34657f;--line:#d9d2c4}
+@media (prefers-color-scheme:dark){:root{--ink:#e8e4da;--paper:#171a1d;--card:#1f242a;--rust:#d07344;--steel:#6da3bf;--line:#333a42}}
+*{box-sizing:border-box}body{margin:0;font:17px/1.55 Georgia,serif;color:var(--ink);background:var(--paper);padding:16px}
+main{max-width:860px;margin:0 auto}
+h1{font-size:2rem;margin:.6em 0 .2em;color:var(--rust)}h2{font-size:1.2rem;margin:1.6em 0 .4em;color:var(--steel)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 20px;margin:14px 0}
+a.btn{display:inline-block;background:var(--rust);color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:bold;margin:6px 8px 6px 0}
+a{color:var(--steel)}code,pre{font:14px/1.45 ui-monospace,Menlo,monospace;background:rgba(127,127,127,.12);border-radius:6px}
+pre{padding:12px;white-space:pre-wrap;overflow-wrap:anywhere}
+button.copy{float:right;font:13px ui-monospace,monospace;padding:4px 10px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink);cursor:pointer}
+.note{font-size:.9rem;opacity:.85}
+table{border-collapse:collapse;width:100%;font-size:.95rem}td,th{border:1px solid var(--line);padding:6px 10px;text-align:left}
+</style>
+</head>
+<body><main>
+<h1>The 1099 Radar</h1>
+<p><b>Free.</b> A Google Sheets + Apps Script tool from <i>Build It With AI</i>, Episode 25. Paste your
+year's payment ledger and vendor list; it tells you which vendors need a <b>1099-NEC</b>, which rent needs a
+<b>1099-MISC</b>, which <b>W-9s</b> you're missing and what that exposure costs, which payments are the card
+processor's job (Form 1099-K) rather than yours, what it refused to read and why — and it re-adds the whole
+ledger to the cent before it will vouch for any of it.</p>
+<p>
+<a class="btn" href="1099_Radar_BUNDLE.zip">Download the bundle (zip)</a>
+<a class="btn" style="background:var(--steel)" href="README.txt">README &amp; sources</a>
+</p>
+<div class="card note"><b>It files nothing, sends nothing, and is not a tax professional.</b> It sorts your
+own ledger by the IRS's published rules and prints its sources, so the January conversation with your
+accountant takes minutes. Built against the <b>TY2026</b> rules — the reporting threshold is <b>$2,000</b>
+now (it was $600), per the IRS Instructions for Forms 1099-MISC and 1099-NEC (12/2026 revision). Sample
+data is fictional (@example.com).</div>
+
+<h2>Set-up (about 3 minutes)</h2>
+<div class="card">
+<ol>
+<li>Make a Google Sheet with tabs <b>Vendors</b> (Vendor | Entity type | W-9 on file | Email) and
+<b>Payments</b> (Date YYYY-MM-DD | Vendor | Description | Category | Method | Amount). Optional <b>Settings</b> tab.</li>
+<li>Extensions → Apps Script → paste <code>radar.gs</code> from the bundle → save → reload the sheet.</li>
+<li>Menu <b>1099 Radar → Build the report</b>. Try the sample CSVs first.</li>
+</ol>
+<table>
+<tr><th>Category values</th><td>Services · Legal services · Parts &amp; materials · Rent · Goods only</td></tr>
+<tr><th>Methods you report</th><td>Check · ACH · Zelle · Cash · Wire</td></tr>
+<tr><th>Processor reports (1099-K)</th><td>Credit card · Debit card · PayPal · Venmo · Square</td></tr>
+<tr><th>Settings</th><td>threshold 2000 · taxYear 2026 · penaltyTier after-aug-1 · dupDays 3</td></tr>
+</table>
+</div>
+
+<h2>The three prompts, exactly as sent</h2>
+<p class="note">The bundle also ships both wrong builds — labeled <b>NOT THE TOOL</b> — plus the independent
+Python checker and the SPEC, so you can re-run the whole verification yourself.</p>
+<div class="card"><button class="copy" data-t="p1">copy</button><b>Prompt 1 — the honest ask (produces the wreck)</b>
+<pre id="p1">In this Google Sheet I have a "Payments" tab (Date, Vendor, Description, Category, Method, Amount) and a "Vendors" tab (Vendor, Entity type, W-9 on file, Email). Write an Apps Script that reads both and tells me which vendors need a 1099 for 2026, with each vendor's total.</pre></div>
+<div class="card"><button class="copy" data-t="p2">copy</button><b>Prompt 2 — the 2026 rules (still misses three)</b>
+<pre id="p2">Rebuild it with the actual 2026 rules from the IRS Instructions for Forms 1099-MISC and 1099-NEC (the 12/2026 revision): the reporting threshold is $2,000 now, not $600. Payments made by credit card or through third-party settlement networks are reported by the processor on Form 1099-K, not by me — exclude them. Payments to corporations are exempt. Rent is not nonemployee compensation: it goes on a 1099-MISC, box 1. Count only payments dated in the tax year, and catch exact duplicate rows pasted twice.</pre></div>
+<div class="card"><button class="copy" data-t="p3">copy</button><b>Prompt 3 — the exceptions and the trust rules (the tool)</b>
+<pre id="p3">Assume the ledger is dirty and every rule has an exception, and write the final version:
+1. Legal services are NEVER exempt — the corporation exemption does not apply to payments for legal services.
+2. Zelle is a bank transfer, not a third-party settlement network. Those payments are still mine to report. PayPal/Venmo/Square/card payments stay excluded.
+3. A service vendor's "Parts &amp; materials" lines count toward the 1099-NEC total.
+4. Refuse any row you cannot read — bad date, bad amount, a vendor not in the Vendors tab, a negative amount — and print the row number and the reason.
+5. Park exact duplicates (same vendor, amount, method, category within a settable window) and count them once, visibly.
+6. Hold payments dated outside the tax year in their own bucket.
+7. List every vendor that needs a form but has no W-9 on file, note that backup withholding (24%) applies until the W-9 lands, and price the exposure from the IRS penalty table for returns due in 2027 ($340 per form after August 1 — charged once for the IRS copy and again for the payee copy).
+8. Re-add every parseable dollar into the buckets and print DO NOT TRUST THIS REPORT if the sum misses by a cent or more than 5% of rows were refused.
+All money in integer cents. Settings (threshold, taxYear, penaltyTier, dupDays) read from a Settings tab. No network calls of any kind.</pre></div>
+
+<h2>Sources (read November 7–8, 2026 — reread before you file)</h2>
+<div class="card note">
+<ul>
+<li><a href="https://www.irs.gov/instructions/i1099mec">IRS Instructions for Forms 1099-MISC and 1099-NEC (12/2026)</a> — $2,000 threshold for tax years beginning after 2025; legal-services exception; 1099-K exclusion; rent on MISC box 1; box 1a includes parts and materials.</li>
+<li><a href="https://www.irs.gov/payments/information-return-penalties">IRS information return penalties</a> (updated 30-Oct-2026) — returns due 2027: $60 / $130 / $340 per form, charged separately for the return and the payee statement.</li>
+<li><a href="https://www.irs.gov/businesses/small-businesses-self-employed/backup-withholding">IRS backup withholding</a> — 24%.</li>
+<li><a href="https://www.avalara.com/us/en/products/1099/pricing.html">Track1099 by Avalara pricing</a> (page modified 2026-10-15) — $3.10/form first 15 federal e-files · $1.49/form state · $2.89/mailing Jan 27–31.</li>
+</ul>
+Verification shipped with the episode: 209 paired runs vs the independent Python checker · 22,906 fields · 0 disagreements · 38 functional checks.
+</div>
+<p class="note">© Build It With AI — Jonathan Gatz. The tool runs entirely inside your own Google Sheet; this page makes no network calls either.</p>
+<script>
+document.querySelectorAll("button.copy").forEach(b=>b.addEventListener("click",async()=>{try{await navigator.clipboard.writeText(document.getElementById(b.dataset.t).textContent);b.textContent="copied";setTimeout(()=>b.textContent="copy",1200)}catch(e){b.textContent="select & copy"}}));
+</script>
+</main></body>
+</html>
