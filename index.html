@@ -4,62 +4,214 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The 1099 Radar — free Google Sheets tool (Build It With AI, Ep 25)</title>
+<meta name="description" content="Free Google Sheets + Apps Script tool: which vendors need a 1099-NEC or 1099-MISC, which W-9s are missing, which payments are the processor's 1099-K — with a to-the-cent self-audit.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%230b120c'/%3E%3Ccircle cx='32' cy='32' r='20' fill='none' stroke='%231f5a32' stroke-width='2'/%3E%3Ccircle cx='32' cy='32' r='10' fill='none' stroke='%231f5a32' stroke-width='2'/%3E%3Cpath d='M32 32 L32 2 A30 30 0 0 1 58 17 Z' fill='%234dff8a' opacity='.45'/%3E%3Ccircle cx='46' cy='16' r='4' fill='%23ffb020'/%3E%3C/svg%3E">
+<!-- IDENTITY: "Radar Scope" — circular phosphor scope hero, threshold rings, tracking-console panels, system sans + mono readouts. (11-27 identity rule) -->
 <style>
-:root{--ink:#1d2730;--paper:#f6f4ee;--card:#fffdf8;--rust:#a74e26;--steel:#34657f;--line:#d9d2c4}
-@media (prefers-color-scheme:dark){:root{--ink:#e8e4da;--paper:#171a1d;--card:#1f242a;--rust:#d07344;--steel:#6da3bf;--line:#333a42}}
-*{box-sizing:border-box}body{margin:0;font:17px/1.55 Georgia,serif;color:var(--ink);background:var(--paper);padding:16px}
-main{max-width:860px;margin:0 auto}
-h1{font-size:2rem;margin:.6em 0 .2em;color:var(--rust)}h2{font-size:1.2rem;margin:1.6em 0 .4em;color:var(--steel)}
-.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 20px;margin:14px 0}
-a.btn{display:inline-block;background:var(--rust);color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:bold;margin:6px 8px 6px 0}
-a{color:var(--steel)}code,pre{font:14px/1.45 ui-monospace,Menlo,monospace;background:rgba(127,127,127,.12);border-radius:6px}
-pre{padding:12px;white-space:pre-wrap;overflow-wrap:anywhere}
-button.copy{float:right;font:13px ui-monospace,monospace;padding:4px 10px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink);cursor:pointer}
-.note{font-size:.9rem;opacity:.85}
-table{border-collapse:collapse;width:100%;font-size:.95rem}td,th{border:1px solid var(--line);padding:6px 10px;text-align:left}
+:root{
+  --bg:#e8eee4; --surface:#f6f9f3; --surface-2:#edf2e9; --ink:#142019; --mute:#4c5b50; --dim:#76857a; --line:#cbd6c6;
+  --brand:#1d7343; --brand-ink:#ffffff; --brand-soft:#d7eadb; --amber:#a35d00; --amber-bg:#f8ead2;
+  --scope:#0b120c; --scope-2:#0f1a11; --phos:#4dff8a; --phos-dim:#1f5a32; --phos-mid:#2f8f52; --blip-amber:#ffb020;
+  --r:10px; --shadow:0 1px 0 rgba(20,32,25,.05),0 12px 28px -18px rgba(20,32,25,.35);
+  --f:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --m:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){
+  --bg:#080c09; --surface:#101812; --surface-2:#152018; --ink:#dde9df; --mute:#9fb1a3; --dim:#6c7f71; --line:#223027;
+  --brand:#4be08a; --brand-ink:#04170b; --brand-soft:#123222; --amber:#ffb020; --amber-bg:#2c200a;
+  --shadow:0 1px 0 rgba(0,0,0,.4),0 14px 30px -18px rgba(0,0,0,.8);}}
+:root[data-theme=dark]{
+  --bg:#080c09; --surface:#101812; --surface-2:#152018; --ink:#dde9df; --mute:#9fb1a3; --dim:#6c7f71; --line:#223027;
+  --brand:#4be08a; --brand-ink:#04170b; --brand-soft:#123222; --amber:#ffb020; --amber-bg:#2c200a;
+  --shadow:0 1px 0 rgba(0,0,0,.4),0 14px 30px -18px rgba(0,0,0,.8);}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 var(--f);-webkit-font-smoothing:antialiased}
+a{color:var(--brand)}
+.wrap{max-width:1120px;margin:0 auto;padding:0 16px}
+@media(min-width:760px){.wrap{padding:0 28px}}
+/* brand bar */
+.bar{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--surface) 90%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.bar .wrap{display:flex;align-items:center;gap:12px;height:58px}
+.logo{width:32px;height:32px;flex:none}
+.bar b{font-weight:750;letter-spacing:-.01em;white-space:nowrap}
+.pill{font:600 11.5px var(--m);color:var(--brand);background:var(--brand-soft);border-radius:999px;padding:5px 10px;white-space:nowrap}
+.sp{flex:1}
+.lnk{color:var(--mute);text-decoration:none;font-weight:600;font-size:14px;white-space:nowrap}
+.lnk:hover{color:var(--ink)}
+.tbtn{appearance:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:6px 11px;font:700 14px var(--f);cursor:pointer}
+@media(max-width:700px){.hide-s{display:none}}
+/* hero */
+.hero{display:grid;gap:30px;align-items:center;padding:36px 0 26px}
+@media(min-width:940px){.hero{grid-template-columns:1.1fr 1fr}}
+.eyebrow{font:700 12px var(--m);letter-spacing:.12em;text-transform:uppercase;color:var(--brand)}
+h1{font-size:clamp(30px,4.6vw,48px);line-height:1.05;letter-spacing:-.03em;margin:10px 0 14px;font-weight:800}
+h1 span{color:var(--amber)}
+.intro{color:var(--mute);font-size:16.5px;margin:0 0 18px;max-width:62ch}
+.intro b{color:var(--ink)}
+.ctas{display:flex;flex-wrap:wrap;gap:10px}
+a.btn{display:inline-flex;align-items:center;gap:8px;text-decoration:none;border-radius:999px;padding:12px 20px;font-weight:750;font-size:15px}
+a.btn.primary{background:var(--brand);color:var(--brand-ink);box-shadow:0 10px 22px -12px var(--brand)}
+a.btn.ghost{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
+a.btn:hover{transform:translateY(-1px)}
+/* scope */
+.console{background:var(--scope);border-radius:16px;padding:16px;color:#c9f7d8;box-shadow:0 30px 60px -30px rgba(0,0,0,.7),inset 0 0 0 1px #1a2b1d}
+.ch{display:flex;justify-content:space-between;align-items:center;gap:10px;font:700 11px var(--m);letter-spacing:.12em;text-transform:uppercase;color:#6fae84;margin-bottom:8px}
+.ch .live{display:inline-flex;align-items:center;gap:6px;color:var(--phos)}
+.ch .live:before{content:"";width:7px;height:7px;border-radius:50%;background:var(--phos);box-shadow:0 0 8px var(--phos)}
+.scopebox{position:relative;width:100%;max-width:440px;margin:0 auto;aspect-ratio:1}
+.scopebox svg{width:100%;height:100%;display:block}
+.sweep{position:absolute;inset:4.5%;border-radius:50%;background:conic-gradient(from 0deg,rgba(77,255,138,.0) 0deg,rgba(77,255,138,.0) 300deg,rgba(77,255,138,.32) 360deg);animation:spin 7s linear infinite;pointer-events:none;mix-blend-mode:screen}
+@keyframes spin{to{transform:rotate(360deg)}}
+.blip{cursor:default}
+.blip circle.dot{transition:fill .3s, r .3s}
+.ring-lbl{font:700 10px var(--m);fill:#6fae84}
+.ring-lbl.on{fill:var(--blip-amber)}
+.bl-lbl{font:600 9.5px var(--f);fill:#9fd8b3}
+.seg{display:flex;justify-content:center;gap:6px;margin:10px 0 6px;flex-wrap:wrap}
+.seg button{appearance:none;border:1px solid #23402b;background:#0f1a11;color:#9fd8b3;border-radius:999px;padding:6px 12px;font:700 12px var(--m);cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--phos);color:#04170b;border-color:var(--phos)}
+.seg button:focus-visible{outline:2px solid var(--blip-amber);outline-offset:2px}
+.readout{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:#1a2b1d;border-radius:10px;overflow:hidden;margin-top:8px}
+.readout div{background:var(--scope-2);padding:10px 12px;font:600 10.5px var(--m);letter-spacing:.08em;text-transform:uppercase;color:#6fae84}
+.readout b{display:block;font:800 clamp(17px,4.6vw,22px) var(--m);overflow-wrap:anywhere;letter-spacing:-.02em;color:var(--phos);text-transform:none;margin-top:2px}
+.readout b.am{color:var(--blip-amber)}
+@media(max-width:520px){.readout{grid-template-columns:1fr}.readout div{display:grid;grid-template-columns:1fr auto;align-items:baseline;column-gap:10px}.readout b{grid-column:2;grid-row:1/3;text-align:right}}
+.readout small{display:block;font:600 11px var(--m);color:#9fd8b3;text-transform:none;letter-spacing:0;margin-top:2px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:center;font:600 11px var(--f);color:#9fd8b3;margin-top:10px}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+.cap{font:12px var(--f);color:#7fa58b;text-align:center;margin-top:8px}
+/* panels */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+.sec{display:flex;align-items:baseline;gap:10px;margin:34px 0 10px}
+.sec h2{margin:0;font-size:20px;letter-spacing:-.015em;font-weight:800}
+.sec .n{font:700 11.5px var(--m);color:var(--brand);letter-spacing:.06em;text-transform:uppercase}
+.sec .why2{margin-left:auto;color:var(--dim);font-size:13px;text-align:right}
+@media(max-width:640px){.sec{flex-wrap:wrap}.sec .why2{margin-left:0;text-align:left;width:100%}}
+.warnpanel{border-left:4px solid var(--amber);background:var(--amber-bg);border-radius:var(--r);padding:16px 20px;color:var(--ink);font-size:15px}
+.warnpanel b:first-child{color:var(--amber)}
+.tbl{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14.5px}
+th{text-align:left;font:700 11px var(--m);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);padding:11px 14px;border-bottom:1px solid var(--line);white-space:nowrap;background:var(--surface-2)}
+td{padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td.r,th.r{text-align:right;white-space:nowrap}
+td.r{font:600 13.5px var(--m)}
+td.key{font-weight:700}
+.trk{display:inline-block;font:700 10.5px var(--m);letter-spacing:.05em;text-transform:uppercase;border-radius:6px;padding:3px 7px;white-space:nowrap}
+.trk.form{background:var(--amber-bg);color:var(--amber)}
+.trk.under{background:var(--brand-soft);color:var(--brand)}
+.trk.off{background:var(--surface-2);color:var(--mute);border:1px solid var(--line)}
+.w9{font:700 11px var(--m);white-space:nowrap}
+.w9.no{color:#c2333a} .w9.yes{color:var(--brand)}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .w9.no{color:#ff7a7f}}
+:root[data-theme=dark] .w9.no{color:#ff7a7f}
+.mini{font-size:12.5px;color:var(--dim)}
+.steps{margin:0;padding:18px 20px 6px 44px}
+.steps li{margin:0 0 10px}
+.kv th{width:30%;white-space:normal;background:transparent;font-size:11px}
+.kv td{font-size:14.5px}
+code{font:13.5px var(--m);background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:1px 6px}
+.prompt{margin-top:12px;overflow:hidden}
+.prompt .ph{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);background:var(--surface-2)}
+.prompt .ph b{font-size:14.5px}
+.prompt .tag{font:700 10.5px var(--m);color:var(--brand);letter-spacing:.06em;text-transform:uppercase}
+button.copy{margin-left:auto;font:700 12px var(--m);padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--ink);cursor:pointer;white-space:nowrap}
+button.copy:hover{border-color:var(--brand);color:var(--brand)}
+pre{margin:0;padding:14px 16px;font:13.5px/1.55 var(--m);white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink)}
+.sources ul{margin:0;padding:16px 20px 10px 38px}
+.sources li{margin:0 0 10px;font-size:14.5px;color:var(--mute)}
+.sources .ver{border-top:1px solid var(--line);padding:12px 20px;font:600 12.5px var(--m);color:var(--brand)}
+.note{color:var(--mute);font-size:14.5px}
+footer{color:var(--dim);font-size:13px;padding:30px 0 50px;margin-top:40px;border-top:1px solid var(--line);display:grid;gap:6px}
+footer a{color:var(--mute)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.sweep{display:none}}
+@media print{.bar,.seg,.ctas,button.copy,.sweep{display:none!important} body{background:#fff;color:#000} .panel{box-shadow:none}}
 </style>
 </head>
-<body><main>
-<h1>The 1099 Radar</h1>
-<p><b>Free.</b> A Google Sheets + Apps Script tool from <i>Build It With AI</i>, Episode 25. Paste your
+<body>
+<header class="bar"><div class="wrap">
+  <svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="30" fill="#0b120c"/><circle cx="32" cy="32" r="20" fill="none" stroke="#1f5a32" stroke-width="2"/><circle cx="32" cy="32" r="10" fill="none" stroke="#1f5a32" stroke-width="2"/><path d="M32 32 L32 2 A30 30 0 0 1 58 17 Z" fill="#4dff8a" opacity=".45"/><circle cx="46" cy="16" r="4" fill="#ffb020"/></svg>
+  <b>The 1099 Radar</b><span class="pill hide-s">● runs in your own Google Sheet · this page makes no network calls</span>
+  <span class="sp"></span>
+  <a class="lnk hide-s" href="https://jonathangeorgegatz.github.io/tools/" target="_blank" rel="noopener">More free tools</a>
+  <button class="tbtn" id="theme" aria-label="Toggle dark mode">◐</button>
+</div></header>
+
+<main class="wrap">
+  <section class="hero">
+    <div>
+      <div class="eyebrow">Build It With AI · Episode 25 · free Google Sheets tool</div>
+      <h1>Every vendor on the scope <span>before January does.</span></h1>
+      <p class="intro"><b>Free.</b> A Google Sheets + Apps Script tool from <i>Build It With AI</i>, Episode 25. Paste your
 year's payment ledger and vendor list; it tells you which vendors need a <b>1099-NEC</b>, which rent needs a
 <b>1099-MISC</b>, which <b>W-9s</b> you're missing and what that exposure costs, which payments are the card
 processor's job (Form 1099-K) rather than yours, what it refused to read and why — and it re-adds the whole
 ledger to the cent before it will vouch for any of it.</p>
-<p>
-<a class="btn" href="1099_Radar_BUNDLE.zip">Download the bundle (zip)</a>
-<a class="btn" style="background:var(--steel)" href="README.txt">README &amp; sources</a>
-</p>
-<div class="card note"><b>It files nothing, sends nothing, and is not a tax professional.</b> It sorts your
+      <div class="ctas">
+        <a class="btn primary" href="1099_Radar_BUNDLE.zip">Download the bundle (zip)</a>
+        <a class="btn ghost" href="README.txt">README &amp; sources</a>
+      </div>
+    </div>
+
+    <div class="console" aria-label="Radar scope: the sample business">
+      <div class="ch"><span>Sample sweep · Saltmarsh Pottery Works</span><span class="live" id="ro_mode">TY2026 · $2,000</span></div>
+      <div class="scopebox">
+        <svg viewBox="0 0 360 360" id="scope" role="img" aria-label="Vendors plotted by total paid, with threshold rings at $600 and $2,000"></svg>
+        <div class="sweep" aria-hidden="true"></div>
+      </div>
+      <div class="seg" role="group" aria-label="Reporting threshold">
+        <button type="button" id="th2000" aria-pressed="true">$2,000 · TY2026 law</button>
+        <button type="button" id="th600" aria-pressed="false">$600 · the retired rule</button>
+      </div>
+      <div class="readout">
+        <div>Forms needed<b class="am" id="ro_forms">—</b><small id="ro_formsd">&nbsp;</small></div>
+        <div>W-9s missing<b class="am" id="ro_chase">—</b><small>backup withholding 24%</small></div>
+        <div>Exposure<b id="ro_exp">—</b><small>penalty tier: after Aug 1</small></div>
+      </div>
+      <div class="legend">
+        <span><i style="background:#ffb020"></i>needs a form</span>
+        <span><i style="background:#4dff8a"></i>under the threshold</span>
+        <span><i style="background:transparent;border:1.5px solid #6fae84"></i>not yours to file</span>
+      </div>
+      <div class="cap">Distance from centre = what you paid them. Fictional sample (@example.com), computed by the bundle's own <code style="background:#0f1a11;border-color:#23402b;color:#9fd8b3">checker.py</code>.</div>
+    </div>
+  </section>
+
+  <div class="warnpanel"><b>It files nothing, sends nothing, and is not a tax professional.</b> It sorts your
 own ledger by the IRS's published rules and prints its sources, so the January conversation with your
 accountant takes minutes. Built against the <b>TY2026</b> rules — the reporting threshold is <b>$2,000</b>
 now (it was $600), per the IRS Instructions for Forms 1099-MISC and 1099-NEC (12/2026 revision). Sample
 data is fictional (@example.com).</div>
 
-<h2>Set-up (about 3 minutes)</h2>
-<div class="card">
-<ol>
-<li>Make a Google Sheet with tabs <b>Vendors</b> (Vendor | Entity type | W-9 on file | Email) and
-<b>Payments</b> (Date YYYY-MM-DD | Vendor | Description | Category | Method | Amount). Optional <b>Settings</b> tab.</li>
-<li>Extensions → Apps Script → paste <code>radar.gs</code> from the bundle → save → reload the sheet.</li>
-<li>Menu <b>1099 Radar → Build the report</b>. Try the sample CSVs first.</li>
-</ol>
-<table>
-<tr><th>Category values</th><td>Services · Legal services · Parts &amp; materials · Rent · Goods only</td></tr>
-<tr><th>Methods you report</th><td>Check · ACH · Zelle · Cash · Wire</td></tr>
-<tr><th>Processor reports (1099-K)</th><td>Credit card · Debit card · PayPal · Venmo · Square</td></tr>
-<tr><th>Settings</th><td>threshold 2000 · taxYear 2026 · penaltyTier after-aug-1 · dupDays 3</td></tr>
-</table>
-</div>
+  <div class="sec"><h2>Contacts on the scope</h2><span class="n" id="n_contacts">sample run</span><span class="why2">what the report says about each sample vendor</span></div>
+  <div class="panel tbl" id="t_contacts"></div>
+  <p class="mini" id="contacts_foot"></p>
 
-<h2>The three prompts, exactly as sent</h2>
-<p class="note">The bundle also ships both wrong builds — labeled <b>NOT THE TOOL</b> — plus the independent
+  <div class="sec"><h2>Set-up (about 3 minutes)</h2></div>
+  <div class="panel">
+    <ol class="steps">
+      <li>Make a Google Sheet with tabs <b>Vendors</b> (Vendor | Entity type | W-9 on file | Email) and
+<b>Payments</b> (Date YYYY-MM-DD | Vendor | Description | Category | Method | Amount). Optional <b>Settings</b> tab.</li>
+      <li>Extensions → Apps Script → paste <code>radar.gs</code> from the bundle → save → reload the sheet.</li>
+      <li>Menu <b>1099 Radar → Build the report</b>. Try the sample CSVs first.</li>
+    </ol>
+    <div class="tbl"><table class="kv">
+      <tr><th>Category values</th><td>Services · Legal services · Parts &amp; materials · Rent · Goods only</td></tr>
+      <tr><th>Methods you report</th><td>Check · ACH · Zelle · Cash · Wire</td></tr>
+      <tr><th>Processor reports (1099-K)</th><td>Credit card · Debit card · PayPal · Venmo · Square</td></tr>
+      <tr><th>Settings</th><td>threshold 2000 · taxYear 2026 · penaltyTier after-aug-1 · dupDays 3</td></tr>
+    </table></div>
+  </div>
+
+  <div class="sec"><h2>The three prompts, exactly as sent</h2></div>
+  <p class="note">The bundle also ships both wrong builds — labeled <b>NOT THE TOOL</b> — plus the independent
 Python checker and the SPEC, so you can re-run the whole verification yourself.</p>
-<div class="card"><button class="copy" data-t="p1">copy</button><b>Prompt 1 — the honest ask (produces the wreck)</b>
+  <div class="panel prompt"><div class="ph"><span class="tag">01</span><b>Prompt 1 — the honest ask (produces the wreck)</b><button class="copy" data-t="p1">copy</button></div>
 <pre id="p1">In this Google Sheet I have a "Payments" tab (Date, Vendor, Description, Category, Method, Amount) and a "Vendors" tab (Vendor, Entity type, W-9 on file, Email). Write an Apps Script that reads both and tells me which vendors need a 1099 for 2026, with each vendor's total.</pre></div>
-<div class="card"><button class="copy" data-t="p2">copy</button><b>Prompt 2 — the 2026 rules (still misses three)</b>
+  <div class="panel prompt"><div class="ph"><span class="tag">02</span><b>Prompt 2 — the 2026 rules (still misses three)</b><button class="copy" data-t="p2">copy</button></div>
 <pre id="p2">Rebuild it with the actual 2026 rules from the IRS Instructions for Forms 1099-MISC and 1099-NEC (the 12/2026 revision): the reporting threshold is $2,000 now, not $600. Payments made by credit card or through third-party settlement networks are reported by the processor on Form 1099-K, not by me — exclude them. Payments to corporations are exempt. Rent is not nonemployee compensation: it goes on a 1099-MISC, box 1. Count only payments dated in the tax year, and catch exact duplicate rows pasted twice.</pre></div>
-<div class="card"><button class="copy" data-t="p3">copy</button><b>Prompt 3 — the exceptions and the trust rules (the tool)</b>
+  <div class="panel prompt"><div class="ph"><span class="tag">03</span><b>Prompt 3 — the exceptions and the trust rules (the tool)</b><button class="copy" data-t="p3">copy</button></div>
 <pre id="p3">Assume the ledger is dirty and every rule has an exception, and write the final version:
 1. Legal services are NEVER exempt — the corporation exemption does not apply to payments for legal services.
 2. Zelle is a bank transfer, not a third-party settlement network. Those payments are still mine to report. PayPal/Venmo/Square/card payments stay excluded.
@@ -71,19 +223,82 @@ Python checker and the SPEC, so you can re-run the whole verification yourself.<
 8. Re-add every parseable dollar into the buckets and print DO NOT TRUST THIS REPORT if the sum misses by a cent or more than 5% of rows were refused.
 All money in integer cents. Settings (threshold, taxYear, penaltyTier, dupDays) read from a Settings tab. No network calls of any kind.</pre></div>
 
-<h2>Sources (read November 7–8, 2026 — reread before you file)</h2>
-<div class="card note">
-<ul>
+  <div class="sec"><h2>Sources (read November 7–8, 2026 — reread before you file)</h2></div>
+  <div class="panel sources">
+    <ul>
 <li><a href="https://www.irs.gov/instructions/i1099mec">IRS Instructions for Forms 1099-MISC and 1099-NEC (12/2026)</a> — $2,000 threshold for tax years beginning after 2025; legal-services exception; 1099-K exclusion; rent on MISC box 1; box 1a includes parts and materials.</li>
 <li><a href="https://www.irs.gov/payments/information-return-penalties">IRS information return penalties</a> (updated 30-Oct-2026) — returns due 2027: $60 / $130 / $340 per form, charged separately for the return and the payee statement.</li>
 <li><a href="https://www.irs.gov/businesses/small-businesses-self-employed/backup-withholding">IRS backup withholding</a> — 24%.</li>
 <li><a href="https://www.avalara.com/us/en/products/1099/pricing.html">Track1099 by Avalara pricing</a> (page modified 2026-10-15) — $3.10/form first 15 federal e-files · $1.49/form state · $2.89/mailing Jan 27–31.</li>
-</ul>
-Verification shipped with the episode: 209 paired runs vs the independent Python checker · 22,906 fields · 0 disagreements · 38 functional checks.
-</div>
-<p class="note">© Build It With AI — Jonathan Gatz. The tool runs entirely inside your own Google Sheet; this page makes no network calls either.</p>
+    </ul>
+    <div class="ver">Verification shipped with the episode: 209 paired runs vs the independent Python checker · 22,906 fields · 0 disagreements · 38 functional checks.</div>
+  </div>
+
+  <footer>
+    <div class="note">© Build It With AI — Jonathan Gatz. The tool runs entirely inside your own Google Sheet; this page makes no network calls either.</div>
+    <div>Made on <a href="https://www.youtube.com/@jonathangatz" target="_blank" rel="noopener">Build It With AI</a> · <a href="https://jonathangeorgegatz.github.io/tools/" target="_blank" rel="noopener">all the free tools</a> · Not tax advice.</div>
+  </footer>
+</main>
+
+<script id="sampledata" type="application/json">{"vendors":[{"vendor":"Alder Point Properties LLC","short":"Alder Point","angle":25,"w9":true,"totalCents":1440000,"track":{"200000":{"kind":"form","label":"1099-MISC · rent box 1"},"60000":{"kind":"form","label":"1099-MISC · rent box 1"}},"extra":""},{"vendor":"Marsh & Vetter P.C.","short":"Marsh & Vetter","angle":60,"w9":false,"totalCents":240000,"track":{"200000":{"kind":"form","label":"1099-NEC"},"60000":{"kind":"form","label":"1099-NEC"}},"extra":"legal services — the corporation exemption does not apply · + $500.00 dated last year, held"},{"vendor":"Brightline Web Studio","short":"Brightline","angle":90,"w9":true,"totalCents":575000,"track":{"200000":{"kind":"off","label":"processor's 1099-K"},"60000":{"kind":"off","label":"processor's 1099-K"}},"extra":""},{"vendor":"Tom Okafor Handyman","short":"T. Okafor","angle":115,"w9":false,"totalCents":185000,"track":{"200000":{"kind":"under","label":"under the threshold"},"60000":{"kind":"form","label":"1099-NEC"}},"extra":""},{"vendor":"Reyes Cleaning Co.","short":"Reyes","angle":172,"w9":false,"totalCents":258000,"track":{"200000":{"kind":"form","label":"1099-NEC"},"60000":{"kind":"form","label":"1099-NEC"}},"extra":""},{"vendor":"Keystone IT Partners Inc.","short":"Keystone IT","angle":205,"w9":true,"totalCents":780000,"track":{"200000":{"kind":"off","label":"exempt · corporation"},"60000":{"kind":"off","label":"exempt · corporation"}},"extra":""},{"vendor":"Granite Supply Co.","short":"Granite","angle":235,"w9":true,"totalCents":770000,"track":{"200000":{"kind":"off","label":"goods only"},"60000":{"kind":"off","label":"goods only"}},"extra":""},{"vendor":"Dara Whitfield Bookkeeping","short":"D. Whitfield","angle":265,"w9":true,"totalCents":312000,"track":{"200000":{"kind":"form","label":"1099-NEC"},"60000":{"kind":"form","label":"1099-NEC"}},"extra":"+ $780.00 duplicate held, counted once"},{"vendor":"Lakeshore HVAC","short":"Lakeshore","angle":295,"w9":true,"totalCents":231000,"track":{"200000":{"kind":"form","label":"1099-NEC"},"60000":{"kind":"form","label":"1099-NEC"}},"extra":"row 64 refused: bad amount"},{"vendor":"Pennon Design","short":"Pennon","angle":150,"w9":true,"totalCents":98000,"track":{"200000":{"kind":"under","label":"under the threshold"},"60000":{"kind":"form","label":"1099-NEC"}},"extra":"row 63 refused: bad date"},{"vendor":"Field & Button Photography","short":"Field & Button","angle":212,"w9":true,"totalCents":64000,"track":{"200000":{"kind":"off","label":"processor's 1099-K"},"60000":{"kind":"off","label":"processor's 1099-K"}},"extra":""}],"runs":{"200000":{"chaseCount":2,"formsNeeded":5,"miscCount":1,"necCount":4,"exposureCents":136000,"parseableCents":5147200,"tie":true,"trust":"OK","refusedRows":3},"60000":{"chaseCount":3,"formsNeeded":7,"miscCount":1,"necCount":6,"exposureCents":204000,"parseableCents":5147200,"tie":true,"trust":"OK","refusedRows":3}},"refusals":[{"reason":"bad date","row":63,"vendor":"Pennon Design"},{"reason":"bad amount","row":64,"vendor":"Lakeshore HVAC"},{"reason":"vendor not in the Vendors tab","row":65,"vendor":"Totem Vending"}]}</script>
 <script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const D=JSON.parse($("sampledata").textContent);
+const money=c=>"$"+(c/100).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const NS="http://www.w3.org/2000/svg";
+const C=180, R=160, MAX=Math.max(...D.vendors.map(v=>v.totalCents));
+const rad=c=>R*Math.sqrt(c/MAX);
+let th="200000";
+function el(n,a,p){const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e}
+function drawScope(){
+  const s=$("scope"); s.innerHTML="";
+  el("circle",{cx:C,cy:C,r:R+8,fill:"#0b120c"},s);
+  for(let a=0;a<360;a+=30){const t=a*Math.PI/180;el("line",{x1:C,y1:C,x2:C+(R+6)*Math.sin(t),y2:C-(R+6)*Math.cos(t),stroke:"#13261a","stroke-width":1},s)}
+  for(const f of [.25,.5,.75,1]) el("circle",{cx:C,cy:C,r:R*f,fill:"none",stroke:"#163020","stroke-width":1},s);
+  for(const [c,lbl,key] of [[60000,"$600","60000"],[200000,"$2,000","200000"]]){
+    const on=key===th, r=rad(c);
+    el("circle",{cx:C,cy:C,r:r,fill:"none",stroke:on?"#ffb020":"#2f8f52","stroke-width":on?2:1.2,"stroke-dasharray":on?"":"4 4"},s);
+    const t=el("text",{x:C-5,y:C-r-4,"text-anchor":"end",class:"ring-lbl"+(on?" on":"")},s); t.textContent=lbl;
+  }
+  el("circle",{cx:C,cy:C,r:3,fill:"#4dff8a"},s);
+  const n=D.vendors.length;
+  D.vendors.forEach((v,i)=>{
+    const t=v.angle*Math.PI/180, r=Math.max(10,rad(v.totalCents));
+    const x=C+r*Math.sin(t), y=C-r*Math.cos(t);
+    const st=v.track[th];
+    const g=el("g",{class:"blip"},s);
+    const ttl=el("title",{},g); ttl.textContent=v.vendor+" — "+money(v.totalCents)+" — "+st.label;
+    if(st.kind==="form"){el("circle",{cx:x,cy:y,r:11,fill:"rgba(255,176,32,.16)"},g);el("circle",{class:"dot",cx:x,cy:y,r:5.5,fill:"#ffb020"},g)}
+    else if(st.kind==="under"){el("circle",{class:"dot",cx:x,cy:y,r:4.5,fill:"#4dff8a"},g)}
+    else{el("circle",{class:"dot",cx:x,cy:y,r:4.5,fill:"none",stroke:"#6fae84","stroke-width":1.5},g)}
+    const lab=el("text",{x:x+(Math.sin(t)>=0?8:-8),y:y+3.5,"text-anchor":Math.sin(t)>=0?"start":"end",class:"bl-lbl"},g);
+    lab.textContent=v.short;
+  });
+}
+function render(){
+  const r=D.runs[th];
+  $("ro_mode").textContent=th==="200000"?"TY2026 · $2,000":"retired rule · $600";
+  $("ro_forms").textContent=r.formsNeeded;
+  $("ro_formsd").textContent=r.necCount+" NEC + "+r.miscCount+" MISC";
+  $("ro_chase").textContent=r.chaseCount;
+  $("ro_exp").textContent=money(r.exposureCents);
+  $("th2000").setAttribute("aria-pressed",th==="200000");$("th600").setAttribute("aria-pressed",th==="60000");
+  drawScope();
+  const rows=D.vendors.map(v=>{const st=v.track[th];
+    return `<tr><td class="key">${esc(v.vendor)}${v.extra?`<div class="mini">${esc(v.extra)}</div>`:""}</td><td><span class="trk ${st.kind}">${esc(st.label)}</span></td><td class="r">${money(v.totalCents)}</td><td><span class="w9 ${v.w9?"yes":"no"}">${st.kind==="form"?(v.w9?"READY":"GET W-9 FIRST"):(v.w9?"on file":"none")}</span></td></tr>`}).join("");
+  $("t_contacts").innerHTML=`<table><thead><tr><th>Vendor</th><th>On the report as</th><th class="r">Paid in 2026</th><th>W-9</th></tr></thead><tbody>${rows}</tbody></table>`;
+  $("n_contacts").textContent="sample run · threshold "+(th==="200000"?"$2,000":"$600");
+  $("contacts_foot").textContent="Also on the sample report: "+r.refusedRows+" rows refused ("+D.refusals.map(x=>"row "+x.row+" "+x.vendor+": "+x.reason).join("; ")+") · ledger re-added to the cent: "+money(r.parseableCents)+(r.tie?" — ties":" — DOES NOT TIE")+" · trust: "+r.trust+".";
+}
+$("th2000").addEventListener("click",()=>{th="200000";render()});
+$("th600").addEventListener("click",()=>{th="60000";render()});
+render();
 document.querySelectorAll("button.copy").forEach(b=>b.addEventListener("click",async()=>{try{await navigator.clipboard.writeText(document.getElementById(b.dataset.t).textContent);b.textContent="copied";setTimeout(()=>b.textContent="copy",1200)}catch(e){b.textContent="select & copy"}}));
+$("theme").addEventListener("click",()=>{const d=document.documentElement;d.dataset.theme=(d.dataset.theme==="dark"||(!d.dataset.theme&&matchMedia("(prefers-color-scheme: dark)").matches))?"light":"dark";});
+})();
 </script>
-</main></body>
+</body>
 </html>
